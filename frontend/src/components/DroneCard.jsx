@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { sendCommand } from "../api/commandApi";
+import { useState, memo } from "react";
+import { useSelector } from "react-redux";
 
 const STATUS_STYLES = {
   online: { background: "#e6f4ea", color: "#1e7e34", border: "1px solid #a8d5b0" },
@@ -7,25 +7,27 @@ const STATUS_STYLES = {
   offline: { background: "#fdecea", color: "#b71c1c", border: "1px solid #f5a0a0" },
 };
 
-function DroneCard({ drone, onCommand }) {
+function DroneCard({ id, onCommand }) {
+  console.log("DroneCard render, id=", id);
+
+  const drone = useSelector(state => state.drones.byId[id]);
+
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState(null);
 
-  const handleCommand = useCallback(
+  const handleCommand =
     async (type) => {
       setSending(true);
       setLastResult(null);
       try {
-        const result = await onCommand(drone.drone_id, type);
+        const result = await onCommand(id, type);
         setLastResult({ ok: true, message: result.message });
       } catch (err) {
         setLastResult({ ok: false, message: err.message });
       } finally {
         setSending(false);
       }
-    },
-    [drone.drone_id, onCommand]
-  );
+    };
 
   return (
     <div style={styles.card}>
@@ -124,4 +126,4 @@ const styles = {
   result: { fontSize: 12, margin: 0 },
 };
 
-export default DroneCard;
+export default memo(DroneCard);

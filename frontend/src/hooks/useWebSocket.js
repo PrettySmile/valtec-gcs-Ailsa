@@ -17,6 +17,7 @@ export function useWebSocket() {
 
       ws.onmessage = (event) => {
         try {
+          console.log("ws.onmessage:", event.data);
           const frame = JSON.parse(event.data);
           dispatch(upsertTelemetry(frame));
         } catch {

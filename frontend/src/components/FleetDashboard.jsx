@@ -1,4 +1,5 @@
-import { useSelector, useDispatch } from "react-redux";
+import { useCallback } from "react";
+import { useSelector } from "react-redux";
 import DroneCard from "./DroneCard";
 import { sendCommand } from "../api/commandApi";
 
@@ -15,25 +16,24 @@ import { sendCommand } from "../api/commandApi";
 // -----------------------------------------------------------------------
 
 function FleetDashboard() {
-  const dispatch = useDispatch();
-
-  const drones = useSelector((state) => state.drones);
-
-  const droneList = drones.ids.map((id) => drones.byId[id]);
+  console.log("FleetDashboard render");
+  
+  const droneIds = useSelector((state) => state.drones.ids);
+  const handleCommand = useCallback((droneId, type) => sendCommand(droneId, type), []);
 
   return (
     <div style={styles.container}>
       <header style={styles.header}>
         <h1 style={styles.title}>Valtec GCS — Fleet Dashboard</h1>
-        <span style={styles.subtitle}>{droneList.length} drones connected</span>
+        <span style={styles.subtitle}>{droneIds.length} drones connected</span>
       </header>
 
       <div style={styles.grid}>
-        {droneList.map((drone) => (
+        {droneIds.map((id) => (
           <DroneCard
-            key={drone.drone_id}
-            drone={drone}
-            onCommand={(droneId, type) => sendCommand(droneId, type)}
+            key={id}
+            id={id}
+            onCommand={handleCommand}
           />
         ))}
       </div>
