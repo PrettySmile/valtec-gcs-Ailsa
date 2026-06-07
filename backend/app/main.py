@@ -1,11 +1,21 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
 from app.routers import telemetry, commands, drones
 from app.dependencies import simulator
+from app.exceptions.handlers import register_exception_handlers
 
-app = FastAPI(title="Valtec GCS API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await simulator.start()
+    yield
+    await simulator.stop()
+
+app = FastAPI(title="Valtec GCS API", lifespan=lifespan)
+
+register_exception_handlers(app)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,17 +27,6 @@ app.add_middleware(
 app.include_router(telemetry.router)
 app.include_router(commands.router)
 app.include_router(drones.router)
-
-
-@app.on_event("startup")
-async def startup():
-    await simulator.start()
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    await simulator.stop()
-
 
 @app.get("/health")
 async def health():

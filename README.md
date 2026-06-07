@@ -21,9 +21,10 @@ Backend API docs: http://localhost:8000/docs
 
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+python3 -m venv venv && source venv/bin/activate
+pip3 install -r requirements.txt
 pytest
+pytest -v -s --log-cli-level=INFO tests/test_commands.py::test_send_command_unexpected_exception
 ```
 
 ## Project structure
@@ -91,6 +92,34 @@ _Describe what was wrong and what you changed._
 ### Bug 2 — API error handling
 
 _List each issue you found and how you fixed it._
+[發現問題1]
+- 問題: 後端收到 API 的第一件事是進行參數與狀態檢查，確保不會讓無效的請求繼續執行後續流程。
+- 修正: 在 command_service.py 內取得無人機狀態，並在無人機不存在或離線時，拋出對應的 DroneNotFoundError 與 DroneOfflineError。
+
+[發現問題2]
+- 問題: 發生異常時，API 需要回傳對應且正確的 HTTP 狀態碼與結構。
+- 修正: 透過 handlers.py 全域異常處理器，將 DroneNotFoundError 映射至 404 Not Found， DroneOfflineError  映射至 409 Conflict，回傳標準化錯誤訊息。
+
+[發現問題3]
+- 問題: 商務邏輯檢查，當無人機狀態為 offline 時，不應該返回代表發送成功的 accepted 狀態。
+- 修正: (這點我先保留，因為如果是 offline 時，或許不該噴錯誤，而是 status 改成 rejected 或 error) 後續考慮修正
+
+[發現問題4]
+- 問題: commands.py 原本直接實例化服務，導致代碼耦合度高，不便於未來替換或測試。
+- 修正: 引入 FastAPI 的 Depends 機制進行依賴注入（Dependency Injection），實現解耦。
+
+[發現問題5]
+- 問題: 需要保障後端 API 的穩定性與邊界案例正確性。
+- 修正: 在 test_commands.py 中補上完整測試案例（包含正常、不存在、格式錯誤、離線、未預期異常等情境），並使用 unittest.mock.patch 進行狀態模擬。
+
+[發現問題6]
+- 問題: 執行單元測試時出現 Deprecation Warning，原因為 @app.on_event 在 FastAPI 中已過時。
+- 修正: 改用 FastAPI 官方推薦最新的 lifespan 異步上下文管理器，使測試輸出更乾淨，代碼符合最新規範。 
+
+[發現問題7]
+- 問題: 錯誤代碼（Error Code）若使用純字串易造成拼寫錯誤（Typo），且缺乏統一結構。
+- 修正: 新增 ErrorCode Enum 集中管理常數，並定義 ErrorResponse Pydantic Model 確保全站錯誤回傳格式一致。
+
 
 ### Feature 3 — Alert system
 
