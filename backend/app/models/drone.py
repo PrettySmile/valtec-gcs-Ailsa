@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, List, Optional
 from datetime import datetime
 
 
@@ -30,3 +30,16 @@ class CommandResponse(BaseModel):
     type: str
     status: Literal["accepted", "rejected", "error"]
     message: str = ""
+
+
+class QueuedCommand(BaseModel):
+    command_id: str
+    type: str
+    created_at: str
+
+
+class QueueStateResponse(BaseModel):
+    drone_id: str
+    executing: Optional[QueuedCommand] = None
+    pending: List[QueuedCommand] = []
+

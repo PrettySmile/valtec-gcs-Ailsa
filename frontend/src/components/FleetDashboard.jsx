@@ -18,8 +18,6 @@ import { sendCommand } from "../api/commandApi";
 // -----------------------------------------------------------------------
 
 function FleetDashboard() {
-  console.log("FleetDashboard render");
-  
   const droneIds = useSelector((state) => state.drones.ids);
   const handleCommand = useCallback((droneId, type) => sendCommand(droneId, type), []);
 

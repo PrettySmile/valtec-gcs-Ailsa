@@ -125,8 +125,6 @@ _List each issue you found and how you fixed it._
 
 在做這題時，我的想法是：既然是儀表板 (Dashboard) 系統，**多個操作員看到的畫面必須是完全一致且即時同步的**。因此，我不打算在前端用 local state，而是採取**「後端控制狀態與廣播」**的核心架構。
 
-以下是我在設計與開發時做出的幾項核心決定：
-
 [設計決定]
 1. **狀態與廣播全由後端掌握**：
    所有的告警判斷（電量低於 20%、離線超過 5 秒）、手動消除狀態，均由後端 `AlertService` 單例統一控制與維護。不論有多少使用者同時開著網頁，只要有人消除警報或狀態有變，後端就會發送 WebSocket 廣播通知所有人。這樣做保證了多個使用者看 Dashboard 時，畫面百分之百同步，而且重整網頁也完全不會弄丟狀態（重連時會直接對齊最新 active 警報）。
@@ -157,4 +155,33 @@ _List each issue you found and how you fixed it._
 
 ### Feature 4 — Command queue
 
-_Describe your queue design and how you handle the offline drain case._
+[設計決定]
+1. **異步佇列排隊 (FIFO Queue)**：
+   當前端發送 `POST /drones/{drone_id}/command` 時，後端 API 在進行基本的狀態檢查後，會立刻生成隨機 `command_id` 並將其塞入該無人機專屬的 `pending` 佇列，隨後**立即回傳 accepted 狀態**。這樣設計能確保 API 的呼叫是非阻塞（Non-blocking）的，前端不需等待執行完成。
+2. **背景協程調度 (Background Runner)**：
+   在後端，為每台無人機啟動一個異步的背景任務協程。只要 `pending` 佇列內有指令，協程就會按順序取出、將狀態標記為「進行中 (`command_executing`)」並透過 WebSocket 廣播，接著使用 `asyncio.sleep` 模擬執行 2~4 秒。執行完畢後廣播「完成 (`command_completed`)」，再接續執行下一個，直到佇列清空。
+3. **更細緻的 WebSocket 廣播分流**：
+   我把 WebSocket 的指令狀態廣播拆細，分成：
+   * `command_executing` (進行中)：前端收到後會展示該指令狀態，並在 DroneCard 狀態欄中套用呼吸漸變動畫。
+   * `command_completed` (完成)：前端收到後亮起綠色提示列。
+   * `command_cancelled` (取消)：前端收到後亮起紅色提示列。
+4. **離線自動清空與中斷 (Offline Drain)**：
+   將 `command_service.process_frame` 訂閱至 telemetry 遙測數據流。一旦接收到無人機狀態轉為 `offline`：
+   * **清空 pending 佇列**：避免無人機離線時還留有待執行指令。
+   * **中止當前任務**：主動呼叫背景任務的 `.cancel()` 協程，強制中斷正在運行的 sleep 模擬，不浪費等待時間。
+   * **廣播取消狀態**：針對「當前執行中」與「所有排隊中」的指令，一併向 WebSocket 廣播 `command_cancelled` 狀態，讓所有在線操作員能即時同步得知任務已被取消，畫面不會卡死。
+5. **前端 2.5 秒自動消失與「中斷防禦」設計 (Timer Management)**：
+   * **自動隱藏**：前端收到完成或取消狀態時，會啟動一個 2.5 秒的計時器，倒數結束後自動清除狀態提示。
+   * **中斷與清理 (useEffect Cleanup)**：在 React 的 `useEffect` 裡，將 `setTimeout` 的 timer ID 儲存起來。一旦在 2.5 秒倒數結束前，無人機又重新上線並快速發送了新指令（狀態變回 `command_executing`），`useEffect` 就會觸發清理機制呼叫 `clearTimeout(timer)` 把舊的計時器中斷並銷毀。這確保了新指令狀態能完美覆蓋舊提示，不會被上一輪未結束的舊計時器誤抹除。
+
+---
+
+[狀態設計 (State Design)]
+* **後端狀態 (In-Memory State)**：
+  在 `CommandService` 內部使用 `self._queues[drone_id]` 維持各無人機狀態：
+  * `executing`：當前執行中的 `QueuedCommand` 對象。
+  * `pending`：排隊等待中的 `QueuedCommand` 列表。
+  * `task`：負責背景調度的 `asyncio.Task` 引用。
+  在 API 層只在無人機在線時允許下發指令。若無人機離線，打 `GET /drones/{drone_id}/commands/pending` 會因為 offline drain 第一時間被清空而正確回傳空的佇列狀態（200 OK），不阻塞前端 UI 的加載。
+* **前端狀態 (Redux Store)**：
+  在 `commandSlice` 裡只維護一個極簡的 `byDroneId` 字典映射。前端直接透過 `useWebSocket` 即時監聽後端廣播的單向狀態（進行中、完成、取消）來驅動 UI，不維護複雜的本地邏輯，確保百分之百與後端同步。

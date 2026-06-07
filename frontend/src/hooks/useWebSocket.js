@@ -2,6 +2,11 @@ import { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { upsertTelemetry } from "../store/droneSlice";
 import { setAlerts } from "../store/alertSlice";
+import {
+  setCommandExecuting,
+  setCommandCompleted,
+  setCommandCancelled,
+} from "../store/commandSlice";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
 const RECONNECT_DELAY_MS = 3000;
@@ -26,6 +31,15 @@ export function useWebSocket() {
               break;
             case "telemetry":
               dispatch(upsertTelemetry(parsed.data));
+              break;
+            case "command_executing":
+              dispatch(setCommandExecuting(parsed.data));
+              break;
+            case "command_completed":
+              dispatch(setCommandCompleted(parsed.data));
+              break;
+            case "command_cancelled":
+              dispatch(setCommandCancelled(parsed.data));
               break;
             default:
               console.warn("Unknown websocket command received:", parsed.cmd);

@@ -11,12 +11,15 @@ from app.exceptions.handlers import register_exception_handlers
 async def lifespan(app: FastAPI):
     from app.services.alert_service import alert_service
     from app.services.connection_manager import connection_manager
+    from app.services.command_service import command_service
     alert_service.on_alerts_update = connection_manager.broadcast
     simulator.subscribe(alert_service.process_frame)
+    simulator.subscribe(command_service.process_frame)
     await simulator.start()
     yield
     alert_service.on_alerts_update = None
     simulator.unsubscribe(alert_service.process_frame)
+    simulator.unsubscribe(command_service.process_frame)
     await simulator.stop()
 
 app = FastAPI(title="Valtec GCS API", lifespan=lifespan)
