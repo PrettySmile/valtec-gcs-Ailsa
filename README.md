@@ -123,7 +123,37 @@ _List each issue you found and how you fixed it._
 
 ### Feature 3 — Alert system
 
-_Describe your state design and any decisions you made._
+在做這題時，我的想法是：既然是儀表板 (Dashboard) 系統，**多個操作員看到的畫面必須是完全一致且即時同步的**。因此，我不打算在前端用 local state，而是採取**「後端控制狀態與廣播」**的核心架構。
+
+以下是我在設計與開發時做出的幾項核心決定：
+
+[設計決定]
+1. **狀態與廣播全由後端掌握**：
+   所有的告警判斷（電量低於 20%、離線超過 5 秒）、手動消除狀態，均由後端 `AlertService` 單例統一控制與維護。不論有多少使用者同時開著網頁，只要有人消除警報或狀態有變，後端就會發送 WebSocket 廣播通知所有人。這樣做保證了多個使用者看 Dashboard 時，畫面百分之百同步，而且重整網頁也完全不會弄丟狀態（重連時會直接對齊最新 active 警報）。
+2. **基於 `cmd` 的 WebSocket 指令分流**：
+   我在 WebSocket 設計了 `{"cmd": "...", "data": ...}` 的結構：
+   * `cmd: "telemetry"`：接收高頻遙測資料（2 Hz）。
+   * `cmd: "alerts"`：同步與接收活動告警列表。
+   這樣一來，前端只要在 `useWebSocket.js` 裡用一個簡單的 `switch (parsed.cmd)` 做分流路由就好，保持職責分離，後續加新指令也很好擴充。
+3. **把 WebSocket 邏輯與 Router 抽離**：
+   我讓 FastAPI 的 Router (如 `alerts.py`) 只做最乾淨的 REST API 接口（如點擊關閉時打的 `POST /alerts/{id}/dismiss`）。核心判定與 WebSocket 的 `broadcast` 實作全都寫在 `AlertService` 與 `ConnectionManager` 內，路由層完全不碰業務細節，這樣代碼最乾淨、也極好寫單元測試。
+4. **擁有完整的告警日誌 (Log) 可供查閱**：
+   在 `AlertService` 與 `ConnectionManager` 裡，我加上了統一格式的 `[ALERT LOG]` 列印功能。無論是「新增告警」、「自動解除」、「手動消除」或是「連線握手時的告警同步」，都會印出帶有精確時間戳的 Log，讓系統在背景運行時極其好排查和調試。
+
+---
+
+[狀態設計 (State Design)]
+
+為了讓告警狀態在 WebSocket 重新連線時能順利留存（Survive reconnect），我採用了「雙端狀態映射」：
+
+* **後端狀態 (In-Memory State)**：
+  在 `AlertService` 維護了三個核心變數：
+  * `active_alerts`: dict，用 `"{drone_id}-{type}"` 作為鍵，儲存當前活動中、還沒被消除的告警物件。
+  * `dismissed_alerts`: set，記錄已被操作員點擊關閉的告警 ID。這解決了「手動消除後，同一次異常不會重複彈出」的問題（直到無人機狀態恢復正常，該 ID 才會被移出 dismissed 集合，下次異常才能再度觸發）。
+  * `offline_start_times`: dict，記錄每台無人機開始 offline 的時間戳，用來精確判定是否超過 5 秒。
+* **前端狀態 (Redux Store)**：
+  在 `alertSlice` 的 state 裡，只有一個極簡的 `list: []`。
+  前端直接訂閱這個 `list` 陣列進行渲染，不維護複雜的 local 狀態。當 WebSocket 重新連線、或收到新的 `cmd: "alerts"` 封包時，後端會把最新 active list 直接打過來覆蓋前端 state。這樣設計確保了前端 UI 永遠是以「後端發過來的最新狀態」為唯一的 Single Source of Truth，絕不會出現同步差錯。
 
 ### Feature 4 — Command queue
 

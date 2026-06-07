@@ -1,7 +1,9 @@
 import { useCallback } from "react";
 import { useSelector } from "react-redux";
 import DroneCard from "./DroneCard";
+import AlertBanner from "./AlertBanner";
 import { sendCommand } from "../api/commandApi";
+
 
 // -----------------------------------------------------------------------
 // BUG #1 — This component has a React re-render performance problem.
@@ -27,6 +29,8 @@ function FleetDashboard() {
         <h1 style={styles.title}>Valtec GCS — Fleet Dashboard</h1>
         <span style={styles.subtitle}>{droneIds.length} drones connected</span>
       </header>
+
+      <AlertBanner />
 
       <div style={styles.grid}>
         {droneIds.map((id) => (

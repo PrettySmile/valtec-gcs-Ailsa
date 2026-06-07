@@ -8,8 +8,6 @@ const STATUS_STYLES = {
 };
 
 function DroneCard({ id, onCommand }) {
-  console.log("DroneCard render, id=", id);
-
   const drone = useSelector(state => state.drones.byId[id]);
 
   const [sending, setSending] = useState(false);

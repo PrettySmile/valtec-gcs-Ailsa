@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useDispatch } from "react-redux";
 import { upsertTelemetry } from "../store/droneSlice";
+import { setAlerts } from "../store/alertSlice";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
 const RECONNECT_DELAY_MS = 3000;
@@ -17,9 +18,18 @@ export function useWebSocket() {
 
       ws.onmessage = (event) => {
         try {
-          console.log("ws.onmessage:", event.data);
-          const frame = JSON.parse(event.data);
-          dispatch(upsertTelemetry(frame));
+          const parsed = JSON.parse(event.data);
+          
+          switch (parsed.cmd) {
+            case "alerts":
+              dispatch(setAlerts(parsed.data));
+              break;
+            case "telemetry":
+              dispatch(upsertTelemetry(parsed.data));
+              break;
+            default:
+              console.warn("Unknown websocket command received:", parsed.cmd);
+          }
         } catch {
           // malformed frame — ignore
         }
@@ -42,3 +52,4 @@ export function useWebSocket() {
     };
   }, [dispatch]);
 }
+
