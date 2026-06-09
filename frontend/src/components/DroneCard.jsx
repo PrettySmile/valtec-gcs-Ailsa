@@ -15,13 +15,38 @@ function DroneCard({ id, onCommand }) {
 
   const [sending, setSending] = useState(false);
   const [lastResult, setLastResult] = useState(null);
+  const [elapsed, setElapsed] = useState("0.0");
 
-  // Auto-dismiss Completed or Cancelled status after 2.5 seconds
+  // Dynamic duration timer for running commands (NTP self-healing version)
   useEffect(() => {
-    if (activeCommand && (activeCommand.status === "completed" || activeCommand.status === "cancelled")) {
+    if (activeCommand && activeCommand.status === "executing" && activeCommand.started_at) {
+      const start = new Date(activeCommand.started_at);
+      const localReceivedAt = new Date();
+      // If client time is slower than server start_at, align localStart to localReceivedAt to avoid negative/frozen values
+      const localStart = (localReceivedAt - start < 0) ? localReceivedAt : start;
+
+      const updateElapsed = () => {
+        const now = new Date();
+        const diff = (now - localStart) / 1000;
+        setElapsed(diff > 0 ? diff.toFixed(1) : "0.0");
+      };
+      
+      updateElapsed();
+      const interval = setInterval(updateElapsed, 100);
+      return () => clearInterval(interval);
+    } else {
+      setElapsed("0.0");
+    }
+  }, [activeCommand]);
+
+  // Auto-dismiss Completed, Cancelled, or Failed status after 2 seconds
+  // 🚀 The clean-up return function guarantees that if activeCommand changes (e.g. A completes, and 1s later B starts),
+  // the previous active dismiss timer is IMMEDIATELY and cleanly destroyed. No remnants!
+  useEffect(() => {
+    if (activeCommand && (activeCommand.status === "completed" || activeCommand.status === "cancelled" || activeCommand.status === "failed")) {
       const timer = setTimeout(() => {
-        dispatch(clearCommandState({ drone_id: id }));
-      }, 2500);
+        dispatch(clearCommandState({ drone_id: id, command_id: activeCommand.command_id }));
+      }, 2000);
       return () => clearTimeout(timer);
     }
   }, [activeCommand, id, dispatch]);
@@ -32,7 +57,7 @@ function DroneCard({ id, onCommand }) {
       setLastResult(null);
       try {
         const result = await onCommand(id, type);
-        setLastResult({ ok: true, message: result.message });
+        setLastResult({ ok: true, status: result.status, message: result.message });
       } catch (err) {
         setLastResult({ ok: false, message: err.message });
       } finally {
@@ -46,29 +71,46 @@ function DroneCard({ id, onCommand }) {
     let style = {};
     let text = "";
     let isExecuting = false;
+    let details = "";
 
-    if (activeCommand.status === "executing") {
+    const { status, type } = activeCommand;
+
+    if (status === "executing") {
       isExecuting = true;
       style = {
         background: "#e8f0fe",
         color: "#1a73e8",
         border: "1px solid #aecbfa",
       };
-      text = `⚡ 正在執行: ${activeCommand.type.toUpperCase()}...`;
-    } else if (activeCommand.status === "completed") {
+      text = `⚡ ${type.toUpperCase()} executing`;
+      details = `Elapsed: ${elapsed}s`;
+    } else if (status === "completed") {
       style = {
         background: "#e6f4ea",
         color: "#1e7e34",
         border: "1px solid #a8d5b0",
       };
-      text = `🟢 ${activeCommand.type.toUpperCase()} 執行完成`;
-    } else if (activeCommand.status === "cancelled") {
+      text = `🟢 ${type.toUpperCase()} completed`;
+      details = "";
+    } else if (status === "cancelled") {
       style = {
         background: "#fdecea",
         color: "#b71c1c",
         border: "1px solid #f5a0a0",
       };
-      text = `🔴 ${activeCommand.type.toUpperCase()} 任務已取消`;
+      text = `🔴 ${type.toUpperCase()} cancelled`;
+      details = "";
+    } else if (status === "failed") {
+      style = {
+        background: "#fdecea",
+        color: "#d93025",
+        border: "1px solid #fbc4c4",
+      };
+      text = `❌ ${type.toUpperCase()} failed`;
+      details = activeCommand.error_message ? `Reason: ${activeCommand.error_message}` : "";
+    } else {
+      // If status is "pending" or any other value, don't show any status bar
+      return null;
     }
 
     return (
@@ -77,9 +119,19 @@ function DroneCard({ id, onCommand }) {
         style={{
           ...styles.commandBar,
           ...style,
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
         }}
       >
-        {text}
+        <span style={{ fontWeight: 600 }}>{text}</span>
+        {details && (
+          <span style={{ fontSize: 10, opacity: 0.9, fontWeight: 500 }}>
+            • {details}
+          </span>
+        )}
       </div>
     );
   };
@@ -121,6 +173,7 @@ function DroneCard({ id, onCommand }) {
         </button>
         <button
           style={{ ...styles.button, ...styles.dangerButton }}
+          // disabled={sending || drone.status === "offline"}
           disabled={sending}
           onClick={() => handleCommand("emergency_land")}
         >
@@ -129,7 +182,14 @@ function DroneCard({ id, onCommand }) {
       </div>
 
       {lastResult && (
-        <p style={{ ...styles.result, color: lastResult.ok ? "#1e7e34" : "#b71c1c" }}>
+        <p style={{ 
+          ...styles.result, 
+          color: !lastResult.ok
+            ? "#b71c1c" // ❌ EXCEPTION (Red)
+            : lastResult.status === "rejected"
+              ? "#b58105" // ⚠️ REJECTED (Yellow)
+              : "#1e7e34" // 🟢 ACCEPTED (Green)
+        }}>
           {lastResult.message}
         </p>
       )}
@@ -158,18 +218,24 @@ const styles = {
     flexDirection: "column",
     gap: 12,
     minWidth: 280,
+    position: "relative",
+    marginTop: "12px",
   },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center" },
   droneId: { fontWeight: 500, fontSize: 15 },
   badge: { fontSize: 12, fontWeight: 500, padding: "2px 10px", borderRadius: 20 },
   commandBar: {
+    position: "absolute",
+    top: "-15px",
+    left: "16px",
+    right: "16px",
     padding: "6px 12px",
-    borderRadius: 8,
-    fontSize: 12,
+    borderRadius: "20px",
+    fontSize: "11px",
     fontWeight: 500,
     textAlign: "center",
-    marginTop: 4,
-    marginBottom: 4,
+    boxShadow: "0 4px 10px rgba(0, 0, 0, 0.12)",
+    zIndex: 10,
     transition: "all 0.3s ease",
   },
   grid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px 12px" },

@@ -2,7 +2,7 @@ from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 import logging
-from app.exceptions.drone import DroneNotFoundError, DroneOfflineError
+from app.exceptions.drone import DroneNotFoundError
 from app.constants.error_codes import ErrorCode
 from app.models.error import ErrorResponse
 
@@ -20,16 +20,6 @@ def register_exception_handlers(app):
             ).model_dump(),
         )
 
-    @app.exception_handler(DroneOfflineError)
-    async def drone_offline_handler(request: Request, exc: DroneOfflineError):
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content=ErrorResponse(
-                code=ErrorCode.DRONE_OFFLINE.value,
-                message=str(exc),
-            ).model_dump(),
-        )
-    
     @app.exception_handler(RequestValidationError)
     async def validation_handler(request: Request, exc: RequestValidationError):
         return JSONResponse(

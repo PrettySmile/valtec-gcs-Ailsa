@@ -6,6 +6,7 @@ import {
   setCommandExecuting,
   setCommandCompleted,
   setCommandCancelled,
+  setCommandFailed,
 } from "../store/commandSlice";
 
 const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8000";
@@ -40,6 +41,9 @@ export function useWebSocket() {
               break;
             case "command_cancelled":
               dispatch(setCommandCancelled(parsed.data));
+              break;
+            case "command_failed":
+              dispatch(setCommandFailed(parsed.data));
               break;
             default:
               console.warn("Unknown websocket command received:", parsed.cmd);

@@ -62,23 +62,23 @@ class AlertService:
                     id=battery_alert_id,
                     drone_id=frame.drone_id,
                     type="low_battery",
-                    message=f"無人機 {frame.drone_id} 電量過低 (<{self.BATTERY_LOW_THRESHOLD}%)",
+                    message=f"Drone {frame.drone_id} low battery (<{self.BATTERY_LOW_THRESHOLD}%)",
                     created_at=datetime.now(timezone.utc).isoformat(),
                 )
                 self.active_alerts[battery_alert_id] = alert
                 self._log_alert(
-                    "新增告警",
+                    "New Alert",
                     battery_alert_id,
-                    f"{frame.drone_id} 電量過低 (<{self.BATTERY_LOW_THRESHOLD}%)",
+                    f"{frame.drone_id} battery low (<{self.BATTERY_LOW_THRESHOLD}%)",
                 )
                 return True
         # 解除告警：電量恢復正常
         else:
             if self._resolve_alert(battery_alert_id):
                 self._log_alert(
-                    "自動解除",
+                    "Auto Resolved",
                     battery_alert_id,
-                    f"{frame.drone_id} 電量恢復 ({frame.battery}%)",
+                    f"{frame.drone_id} battery recovered ({frame.battery}%)",
                 )
                 return True
 
@@ -105,14 +105,14 @@ class AlertService:
                             id=offline_alert_id,
                             drone_id=frame.drone_id,
                             type="offline",
-                            message=f"無人機 {frame.drone_id} 離線已超過 {self.OFFLINE_TIMEOUT_SECONDS} 秒",
+                            message=f"Drone {frame.drone_id} offline for more than {self.OFFLINE_TIMEOUT_SECONDS} seconds",
                             created_at=frame.timestamp.isoformat(),
                         )
                         self.active_alerts[offline_alert_id] = alert
                         self._log_alert(
-                            "新增告警",
+                            "New Alert",
                             offline_alert_id,
-                            f"{frame.drone_id} 離線已超過 {self.OFFLINE_TIMEOUT_SECONDS} 秒",
+                            f"{frame.drone_id} offline for more than {self.OFFLINE_TIMEOUT_SECONDS} seconds",
                         )
                         return True
         # 解除告警：連線恢復正常
@@ -122,7 +122,7 @@ class AlertService:
             # 移除告警狀態
             if self._resolve_alert(offline_alert_id):
                 self._log_alert(
-                    "自動解除", offline_alert_id, f"{frame.drone_id} 恢復連線"
+                    "Auto Resolved", offline_alert_id, f"{frame.drone_id} connection restored"
                 )
                 return True
 
@@ -148,7 +148,7 @@ class AlertService:
         """統一的警報 Log 格式化工具"""
         timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         logger.info(
-            f"[ALERT LOG] {timestamp_str} | 廣播：[{action_type}] id={alert_id} | {message}"
+            f"[ALERT LOG] {timestamp_str} | Broadcast: [{action_type}] id={alert_id} | {message}"
         )
 
     async def dismiss_alert(self, alert_id: str):
@@ -156,7 +156,7 @@ class AlertService:
         if alert_id in self.active_alerts:
             self.active_alerts.pop(alert_id)
             self.dismissed_alerts.add(alert_id)
-            self._log_alert("手動消除", alert_id, "操作員消除告警")
+            self._log_alert("Manual Dismiss", alert_id, "Operator dismissed alert")
             if self.on_alerts_update:
                 await self.on_alerts_update({
                     "cmd": "alerts",

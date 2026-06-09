@@ -76,11 +76,11 @@ async def test_send_command_offline_drone():
                 json={"type": "land"},
             )
 
-    assert response.status_code == 409
+    assert response.status_code == 200
 
     data = response.json()
 
-    assert data["code"] == ErrorCode.DRONE_OFFLINE.value
+    assert data["status"] == "rejected"
 
 
 @pytest.mark.asyncio

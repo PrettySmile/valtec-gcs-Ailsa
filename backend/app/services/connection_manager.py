@@ -19,7 +19,7 @@ class ConnectionManager:
         active_ids = [alert.id for alert in alert_service.get_active_alerts()]
         timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         logger.info(
-            f"[ALERT LOG] {timestamp_str} | 廣播：[連線同步] 當前活動告警: {active_ids}"
+            f"[ALERT LOG] {timestamp_str} | Broadcast: [Connection Sync] Active Alerts: {active_ids}"
         )
 
         try:

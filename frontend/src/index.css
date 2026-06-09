@@ -20,3 +20,50 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   animation: pulseGlow 1.5s infinite ease-in-out;
 }
 
+/* Custom styling for AlertBanner interactive elements */
+.alert-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #d32f2f;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: opacity 0.2s ease;
+  outline: none;
+}
+.alert-toggle-btn:hover {
+  opacity: 0.8;
+}
+
+.alert-search-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+  background: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+.alert-search-input:focus {
+  border-color: #d32f2f !important;
+  box-shadow: 0 0 0 2px rgba(211, 47, 47, 0.1) !important;
+}
+
+.alert-row-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.alert-row-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+
